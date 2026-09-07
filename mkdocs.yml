@@ -1,8 +1,8 @@
-site_name: Template de Entrega
-site_author: Sandmann, H.
-site_url: https://hsandmann.github.io/documentation.template
-repo_url: https://github.com/hsandmann/documentation.template
-repo_name: github/documentation.template
+site_name: Redes_neurais2026/2
+site_author: luabatepietro
+site_url: https://luabatepietro.github.io/redes_neurais 
+repo_url: https://github.com/luabatepietro/redes_neurais 
+repo_name: github/redes_neurais
 
 theme:
   name: material
@@ -110,7 +110,7 @@ plugins:
       enable_creation_date: true
   - git-authors
   - git-committers:
-      repository: hsandmann/documentation.template
+      repository: <your-github-username>/<your-repo-name> # TODO
       branch: main
   - search
   - badges
@@ -141,11 +141,6 @@ extra_javascript:
 
 nav:
   - Home: index.md
-  - This documentation: ./thisdocumentation/index.md
-  - Roteiros:
-    - Roteiro 1: ./roteiro1/index.md
-    - Roteiro 2: ./roteiro2/index.md
-    - Roteiro 3: ./roteiro3/index.md
-    - Roteiro 4: ./roteiro4/index.md
-    - Notebook 1: ./notebook1/ex1_data.ipynb
-  - Projeto: ./projeto/index.md
+  - Exercises:
+    - 1. Data: ./exercises/data/index.md
+  - Projects: ./projects/index.md
