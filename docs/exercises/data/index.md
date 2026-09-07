@@ -1,39 +1,43 @@
 ---
 exercise: data
-ai_use: "Claude assisted in writing the data-generation, analysis and preprocessing code and in drafting this report; TODO - edit this line to accurately describe your own use of AI tools before submitting."
+ai_use: "Claude foi usado para escrever o código de geração/pré-processamento dos dados, gerar as figuras e redigir um primeiro rascunho da análise. TODO - revise e ajuste esta linha para descrever com precisão o seu próprio uso de IA antes de entregar."
 ---
 
 # 1. Data
 
+!!! abstract "Enunciado"
+
+    [Exercises → Data](https://insper.github.io/ann-dl/){:target='_blank'}
+
 ## Exercise 1
 
-### Point Clouds: Geometry and Spread in 2D
-
-For this one I generated four 2D Gaussian clouds with `rng = np.random.default_rng(42)` and kept that same rng for everything downstream. Then I regenerated the same four classes at four different spread levels and looked at how quickly they start running into each other, using a separation ratio and a simple nearest-centroid mixing rate. No model gets trained anywhere in this exercise — it's all just geometry.
+Para este exercício gerei quatro nuvens gaussianas 2D com `rng = np.random.default_rng(42)`, mantendo essa mesma seed em todo o resto do exercício. Depois regenerei as mesmas quatro classes em quatro níveis de dispersão diferentes para ver com que velocidade elas passam a se sobrepor, usando uma razão de separação geométrica e uma taxa de mistura por vizinho mais próximo. Nenhum modelo é treinado aqui — é só geometria.
 
 ### A — Generate the clouds
 
-400 points total, 100 per class, straight from the means and standard deviations given in the prompt.
+400 pontos no total, 100 por classe, gerados a partir das médias e desvios-padrão dados no enunciado.
 
-![Figure 1](figures/fig1_point_clouds.png)
+![Nuvens de pontos das quatro classes gaussianas, com fronteiras de decisão esboçadas](figures/fig1_point_clouds.png)
+/// caption
+**Figura 1** — as quatro nuvens em s = 1.0. Centros marcados com um X, e também esbocei as regiões de vizinho-mais-próximo (linhas tracejadas) — é basicamente a fronteira que uma rede pequena aprenderia; reaproveito isso na parte C.
+///
 
-*Figure 1 — the four clouds at s = 1.0. Centers marked with an X, and I also added the nearest-centroid regions (dashed lines) since that's basically the boundary a small trained network would end up learning — I reuse this in part C.*
-
-```python
+``` { .python .copy .select linenums='1' title="docs/exercises/data/code/ex1_point_clouds.py" }
 --8<-- "docs/exercises/data/code/ex1_point_clouds.py"
 ```
 
 ### B — More or less spread out
 
-Same 4 classes, regenerated four times with the std devs multiplied by `s ∈ {0.5, 1.0, 2.0, 4.0}` (means stay put).
+As mesmas 4 classes, regeneradas quatro vezes com os desvios-padrão multiplicados por `s ∈ {0.5, 1.0, 2.0, 4.0}` (as médias não mudam).
 
-![Figure 2](figures/fig2_spread_subplots.png)
+![As quatro versões, uma por nível de dispersão](figures/fig2_spread_subplots.png)
+/// caption
+**Figura 2** — as quatro versões nos mesmos eixos, para comparação justa.
+///
 
-*Figure 2 — all four versions on shared axes so the comparison is fair.*
+**Razão de separação r_ij em s = 1.0**, os 6 pares:
 
-**Separation ratio r_ij at s = 1.0**, all 6 pairs:
-
-| Pair (i, j) | r_ij |
+| Par (i, j) | r_ij |
 |---|---|
 | 0–1 | 1.326 |
 | 0–2 | 2.480 |
@@ -42,99 +46,108 @@ Same 4 classes, regenerated four times with the std devs multiplied by `s ∈ {0
 | 1–3 | 3.642 |
 | 2–3 | 3.542 |
 
-Smallest one is pair (0, 1) at 1.326. Since the means never move, r_ij just scales as 1/s, so at s = 2 that same pair drops to 1.326 / 2 = **0.663** — no need to regenerate anything, just divide.
+O menor valor é o par (0, 1), com 1.326. Como as médias nunca se movem, r_ij escala como 1/s — então em s = 2 esse mesmo par cai para 1.326 / 2 = **0.663**, sem precisar regenerar nada.
 
-**Mixing rate per scale** (fraction of points whose nearest mean isn't their own class):
+**Taxa de mistura por escala** (fração de pontos cuja média mais próxima não é a da própria classe):
 
-| s | mixing rate |
+| s | taxa de mistura |
 |---|---|
 | 0.5 | 0.0000 |
 | 1.0 | 0.0675 |
 | 2.0 | 0.2250 |
 | 4.0 | 0.4175 |
 
-![Figure 3](figures/fig3_mixing_rate.png)
+![Taxa de mistura crescendo com a dispersão](figures/fig3_mixing_rate.png)
+/// caption
+**Figura 3** — taxa de mistura subindo de forma constante com s.
+///
 
-*Figure 3 — mixing rate climbing steadily with s.*
-
-So: where does linear separability actually break down? Somewhere between s = 1 and s = 2. At s = 1 the worst-case r_ij is still 1.326, i.e. the two closest centers are further apart than their combined spread. By s = 2 that same ratio has fallen to 0.663 — under 1, meaning the spread now beats the distance between centers. And that's exactly where the mixing rate takes its biggest jump too, from 6.75% up to 22.5%. The two measures agree.
+Onde a separabilidade linear realmente quebra? Em algum ponto entre s = 1 e s = 2. Em s = 1 o pior r_ij ainda é 1.326 — os dois centros mais próximos continuam mais distantes que a dispersão combinada deles. Em s = 2 essa mesma razão já caiu para 0.663, abaixo de 1: a dispersão passa a dominar a distância entre centros. E é exatamente aí que a taxa de mistura dá seu maior salto, de 6.75% para 22.5%. As duas medidas concordam.
 
 ### C — Analysis
 
-1. At s = 1, classes 0 and 1 sit right next to each other and blend a bit (makes sense, they have the smallest r_ij). Class 2 is below them, reasonably separated, and class 3 is way off to the right on its own — nothing to worry about there. Could one straight line separate all four? No — it's a 4-class problem and a single hyperplane only gives you two sides. A handful of linear boundaries stitched together does a decent job though, as you can see in Figure 1: three of the four regions come out clean, and the only messy one is the 0/1 boundary, right where the actual overlap is.
-2. The dashed lines in Figure 1 are that sketch — nearest-centroid regions computed over the four means. It's a reasonable stand-in for what a small network would learn here, since the clusters are all roughly the same rough shape.
-3. Tying it back to part B: as s grows the clouds swell and start eating into each other's territory, and the strip around each boundary line gets fatter. That's literally what the mixing rate is counting. At s = 0.5 there's barely any overlap zone (mixing rate ~0), but by s = 4 almost half the points (41.75%) land on the wrong side of their own centroid, because at that point the boundary just can't keep up with how spread out everything is.
+1. Em s = 1, as classes 0 e 1 ficam bem próximas e se misturam um pouco (faz sentido, é o par com menor r_ij). A classe 2 fica abaixo delas, razoavelmente separada, e a classe 3 está bem à direita, isolada — sem problema nenhum ali. Uma única reta separaria as quatro classes? Não — é um problema de 4 classes e um hiperplano só divide o espaço em dois lados. Um conjunto de fronteiras lineares encadeadas já resolve bem, como dá para ver na Figura 1: três das quatro regiões saem limpas, e a única confusa é a fronteira 0/1, exatamente onde a sobreposição de fato acontece.
+2. As linhas tracejadas na Figura 1 são esse esboço — regiões de vizinho-mais-próximo calculadas sobre as quatro médias. É uma aproximação razoável do que uma rede pequena aprenderia aqui, já que os clusters têm formatos parecidos entre si.
+3. Ligando com a parte B: conforme s cresce, as nuvens incham e passam a invadir o território umas das outras, e a faixa em torno de cada fronteira fica mais grossa. É exatamente isso que a taxa de mistura está contando. Em s = 0.5 quase não há zona de sobreposição (mistura ~0%), mas em s = 4 quase metade dos pontos (41.75%) cai do lado "errado" do seu próprio centroide, porque nesse ponto a fronteira simplesmente não acompanha mais o quanto tudo se espalhou.
 
 ---
 
 ## Exercise 2
 
-### Non-Linearity in Higher Dimensions
-
-Two 5D datasets here, 500 points per class each. Dataset I is two shifted multivariate Gaussians with different covariance structure. Dataset II is two concentric "shells" — pick a random direction on the unit sphere, then a random radius. I looked at both through a PCA projection and also directly in 5D.
+Dois datasets 5D aqui, 500 pontos por classe. O Dataset I é duas gaussianas multivariadas deslocadas, com estruturas de covariância diferentes. O Dataset II é duas "cascas" concêntricas — escolho uma direção aleatória na esfera unitária e depois um raio aleatório. Analisei os dois via projeção PCA e também diretamente em 5D.
 
 ### A — Dataset I: shifted Gaussians
 
-Straightforward — `rng.multivariate_normal` with the given `μ_A, Σ_A, μ_B, Σ_B`.
+Direto: `rng.multivariate_normal` com os `μ_A, Σ_A, μ_B, Σ_B` dados.
 
 ### B — Dataset II: concentric shells
 
-Direction vectors come from `𝒩(0, I₅)`, normalized to unit length. Class C (the core) gets radius `𝒩(2.0, 0.4)`, Class D (the shell around it) gets `𝒩(5.0, 0.4)`.
+Os vetores de direção vêm de `𝒩(0, I₅)`, normalizados para norma unitária. A Classe C (núcleo) usa raio `𝒩(2.0, 0.4)`, a Classe D (casca em volta) usa `𝒩(5.0, 0.4)`.
 
-```python
+``` { .python .copy .select linenums='1' title="docs/exercises/data/code/ex2_nonlinearity.py" }
 --8<-- "docs/exercises/data/code/ex2_nonlinearity.py"
 ```
 
 ### C — Visualize and compare
 
-![Figure 4](figures/fig4_pca_projection.png)
+![Projeção PCA dos dois datasets](figures/fig4_pca_projection.png)
+/// caption
+**Figura 4** — os dois datasets projetados em 2D via PCA.
+///
 
-*Figure 4 — both datasets projected down to 2D with PCA.*
-
-| | Explained variance (PC1 + PC2) |
+| | Variância explicada (PC1 + PC2) |
 |---|---|
 | Dataset I | 0.660 |
 | Dataset II | 0.429 |
 
-Dataset I keeps a lot more information in the first two components (66% vs 43%) and the classes are still visibly apart after projecting — makes sense, PCA is chasing the direction of highest variance and that direction happens to line up with the shift between A and B. Dataset II doesn't have that luck: its two classes look like one big blob once flattened to 2D, because what actually separates them (radius from the origin) isn't the direction PCA cares about.
+O Dataset I mantém bem mais informação nos dois primeiros componentes (66% contra 43%) e as classes continuam visivelmente separadas após a projeção — faz sentido, o PCA persegue a direção de maior variância e essa direção coincide com o deslocamento entre A e B. O Dataset II não tem essa sorte: suas duas classes parecem uma bolha só depois de achatadas em 2D, porque o que de fato as separa (o raio em relação à origem) não é a direção que o PCA valoriza.
 
-**In 5D, no projection involved:**
+**Em 5D, sem projeção nenhuma:**
 
-| | Distance between centers ‖μ₁ − μ₂‖ |
+| | Distância entre centros ‖μ₁ − μ₂‖ |
 |---|---|
 | Dataset I | 3.228 |
 | Dataset II | 0.266 |
 
-![Figure 5](figures/fig5_radius_histograms.png)
-
-*Figure 5 — ‖x‖ histograms per class, both datasets.*
+![Histogramas de raio por classe](figures/fig5_radius_histograms.png)
+/// caption
+**Figura 5** — histogramas de ‖x‖ por classe, nos dois datasets.
+///
 
 ### D — Analysis
 
-1. This is the interesting part of Dataset II: the centers are almost on top of each other (0.266 apart, basically zero by construction — both shells are centered at the origin), and yet Figure 5 shows the radius histograms don't overlap at all. That combination is a dead giveaway for radial structure. A hyperplane works by picking a direction and thresholding along it, and when both classes share a center, there's no direction where one class systematically sits further along than the other — the "far from origin vs close to origin" signal just isn't something a linear projection can pick up.
-2. And that's exactly why no hyperplane can ever solve this, no matter how much data you throw at it. The two classes are literally nested shells around the same center. A hyperplane cuts space into two half-spaces, but each half-space still contains points at every radius — near and far — so it always slices straight through both shells. It's a geometry problem, not a data problem, so more samples won't fix it.
-3. Does a mixed-looking PCA projection mean the classes are truly inseparable? No, and this dataset is a good counterexample. PCA only optimizes for retained variance, not for keeping classes apart, so it's entirely possible for it to throw away the one direction (or in this case, one nonlinear quantity) that actually does the separating. Here that quantity is `f(x) = ‖x‖² = Σᵢxᵢ²`. Computing it directly: the core class averages ‖x‖² ≈ 4.04 (max 10.54), the shell class averages ≈ 25.21 (min 14.08) — the two ranges don't even touch. A threshold around 12.3 separates all 1000 points with zero mistakes, even though the same points looked hopelessly mixed after PCA.
+!!! note "Fronteiras não lineares"
+
+    Para justificar por que as cascas concêntricas exigem fronteira não linear, ajuda escrever a condição de decisão. Um separador linear é
+
+    $$
+    f(\mathbf{x}) = \mathbf{w}^\top \mathbf{x} + b,
+    $$
+
+    enquanto a estrutura das cascas depende de $\lVert \mathbf{x} \rVert$, que não é expressável nessa forma.
+
+1. Essa é a parte interessante do Dataset II: os centros estão quase sobrepostos (0.266 de distância, essencialmente zero por construção — as duas cascas são centradas na origem), e mesmo assim a Figura 5 mostra que os histogramas de raio não se sobrepõem em nada. Essa combinação é uma assinatura clara de estrutura radial. Um hiperplano funciona escolhendo uma direção e aplicando um limiar; quando as duas classes compartilham o centro, não existe direção em que uma classe fique sistematicamente mais longe que a outra — o sinal "perto da origem vs. longe da origem" simplesmente não é algo que uma projeção linear capta.
+2. E é exatamente por isso que nenhum hiperplano resolve esse problema, não importa quantos dados a mais eu use. As duas classes são literalmente cascas aninhadas ao redor do mesmo centro. Um hiperplano corta o espaço em dois semi-espaços, mas cada semi-espaço ainda contém pontos em todos os raios — perto e longe — então ele sempre corta as duas cascas ao meio. É um problema de geometria, não de quantidade de dados.
+3. Uma projeção PCA misturada prova que as classes são inseparáveis de verdade? Não, e esse dataset é um bom contraexemplo. O PCA só otimiza variância retida, não separação de classes, então é perfeitamente possível que ele descarte justamente a direção (ou, nesse caso, a quantidade não linear) que separa tudo. Aqui essa quantidade é `f(x) = ‖x‖² = Σᵢxᵢ²`. Calculando direto: o núcleo tem ‖x‖² médio ≈ 4.04 (máximo 10.54), a casca tem ≈ 25.21 (mínimo 14.08) — as faixas nem se tocam. Um limiar por volta de 12.3 separa os 1000 pontos sem nenhum erro, mesmo os mesmos pontos parecendo completamente misturados depois do PCA.
 
 ---
 
 ## Exercise 3
 
-### Preparing Real-World Data for a Neural Network
-
-Using the Spaceship Titanic `train.csv` (8,693 rows). I split first, before touching any statistics, then did imputation, encoding, a bit of feature engineering, log-transforming the skewed columns, and finally scaling — with every fitted step trained only on the training split — to get something a `tanh` hidden layer can actually work with.
+Usando o `train.csv` do Spaceship Titanic (8.693 linhas). Fiz o split antes de calcular qualquer estatística, depois imputação, encoding, um pouco de feature engineering, transformação log nas colunas enviesadas e por fim escalonamento — com cada etapa ajustada só no treino — para chegar em algo que uma camada oculta `tanh` consiga usar de verdade.
 
 ### A — Get to know the data
 
-`Transported` is the target: did the passenger get pulled into another dimension or not. It's close to a coin flip — **50.36% True / 49.64% False** — so no class imbalance to worry about here.
+`Transported` é o alvo: se o passageiro foi ou não puxado para outra dimensão. É quase uma moeda honesta — **50.36% True / 49.64% False** — então não há desbalanceamento de classe para se preocupar.
 
-**Feature types**
+**Tipos de feature**
 
-- Numerical: `Age`, `RoomService`, `FoodCourt`, `ShoppingMall`, `Spa`, `VRDeck`
-- Categorical: `HomePlanet`, `CryoSleep`, `Destination`, `VIP` (`Cabin`, `Name`, and `PassengerId` get dropped or turned into something else — see part C)
+- Numéricas: `Age`, `RoomService`, `FoodCourt`, `ShoppingMall`, `Spa`, `VRDeck`
+- Categóricas: `HomePlanet`, `CryoSleep`, `Destination`, `VIP` (`Cabin`, `Name` e `PassengerId` são descartadas ou viram outra coisa — ver parte C)
 
-**Missing values**
+**Valores ausentes**
 
-| Column | Missing count | Missing % |
+| Coluna | Ausentes (contagem) | Ausentes (%) |
 |---|---|---|
 | CryoSleep | 217 | 2.50% |
 | ShoppingMall | 208 | 2.39% |
@@ -149,51 +162,65 @@ Using the Spaceship Titanic `train.csv` (8,693 rows). I split first, before touc
 | RoomService | 181 | 2.08% |
 | Age | 179 | 2.06% |
 
-Nothing stands out — every column sits around 2 to 2.5% missing. Looks like random dropout across the board rather than one field being systematically broken.
+Nada chama atenção — toda coluna fica entre 2% e 2.5% de ausência. Parece dropout aleatório espalhado, não um campo especificamente quebrado.
 
-**Spending columns**
+**Colunas de gasto**
 
-| Column | Mean | Median | Max |
+| Coluna | Média | Mediana | Máximo |
 |---|---|---|---|
-| RoomService | 224.69 | 0.0 | 14,327 |
-| FoodCourt | 458.08 | 0.0 | 29,813 |
-| ShoppingMall | 173.73 | 0.0 | 23,492 |
-| Spa | 311.14 | 0.0 | 22,408 |
-| VRDeck | 304.85 | 0.0 | 24,133 |
+| RoomService | 224.69 | 0.0 | 14.327 |
+| FoodCourt | 458.08 | 0.0 | 29.813 |
+| ShoppingMall | 173.73 | 0.0 | 23.492 |
+| Spa | 311.14 | 0.0 | 22.408 |
+| VRDeck | 304.85 | 0.0 | 24.133 |
 
-Every single one of these has a median of exactly 0 while the mean sits in the hundreds. Most passengers just don't spend anything, and a small chunk spend a ton (the maxes run into the tens of thousands). Mean way above median is the classic sign of a skewed, heavy-tailed distribution — that's the reason for the log transform coming up in part C.
+Todas essas colunas têm mediana exatamente 0 enquanto a média fica na casa das centenas. A maioria dos passageiros simplesmente não gasta nada, e uma fatia pequena gasta muito (os máximos chegam a dezenas de milhares). Média bem acima da mediana é a assinatura clássica de uma distribuição enviesada e de cauda pesada — motivo da transformação log na parte C.
 
 ### B — Split before you transform
 
-80/20 split, stratified on `Transported`, `random_state=42`.
+Split 80/20, estratificado por `Transported`, `random_state=42`.
 
-Why before imputation and scaling? Because both of those steps compute something from the data — the median for filling gaps, the mean/std for scaling — and if that "something" is computed using rows the model will later be tested on, the model has effectively already peeked at the test set before it even started training. The split has to happen first so the test set stays genuinely unseen.
+Por que antes da imputação e do escalonamento? Porque as duas etapas calculam algo a partir dos dados — a mediana para preencher lacunas, a média/desvio para escalonar — e se esse "algo" for calculado usando linhas que o modelo vai ver no teste depois, o modelo já deu uma espiada no teste antes mesmo de começar a treinar. O split precisa vir primeiro para o teste continuar genuinamente não visto.
 
 ### C — Preprocess
 
-```python
+``` { .python .copy .select linenums='1' title="docs/exercises/data/code/ex3_preprocessing.py" }
 --8<-- "docs/exercises/data/code/ex3_preprocessing.py"
 ```
 
-1. **Missing data.** Median imputation for the numerical columns — robust against those long-tailed spending values and any odd ages — and most-frequent-category imputation for the categorical ones. Both imputers are fit on the training split only, then applied to test.
-2. **Categorical encoding.** One-hot encoding for `HomePlanet`, `CryoSleep`, `Destination`, `VIP`, using `OneHotEncoder(handle_unknown="ignore")` fit on the training categories. If the test set has a category the encoder never saw during training, it just gets an all-zero row for that feature instead of throwing an error — the model gets no signal from it rather than the whole thing crashing.
-3. **Feature engineering.** `TotalSpend` is just the row-wise sum across the five spending columns (before the log transform, `skipna=True` so missing values don't wipe out the whole sum). `Cabin`, `Name`, and `PassengerId` get dropped — they're identifiers or free text, not really usable as-is.
-4. **Heavy tails.** `log1p` on the five spending columns plus the new `TotalSpend`. Figure 6 shows what this does to `FoodCourt`.
-5. **Scaling.** Standardized the whole numerical block (the 6 original numeric columns plus `TotalSpend`) to mean 0, std 1, fit on train only. I went with standardization instead of squeezing everything into `[-1, 1]`, since even after the log transform the spending columns still have a bit of a tail, and a hard min/max rescale would crush the genuinely large (rare) values right up against the boundary.
+!!! warning "Vazamento de dados"
+
+    O `train_test_split` vem **antes** de qualquer imputação, encoding ou escalonamento. Os transformadores são ajustados só no treino e aplicados ao teste.
+
+``` mermaid
+flowchart LR
+    raw[Dados brutos] --> split{{train_test_split}}
+    split -->|treino| fit[fit_transform]
+    split -->|teste| apply[transform]
+    fit --> model[Modelo]
+    apply --> model
+```
+
+1. **Dados ausentes.** Imputação por mediana nas colunas numéricas — robusta contra as caudas longas das colunas de gasto e contra idades estranhas — e por categoria mais frequente nas categóricas. Os dois imputadores são ajustados só no treino e depois aplicados ao teste.
+2. **Encoding categórico.** One-hot encoding para `HomePlanet`, `CryoSleep`, `Destination`, `VIP`, usando `OneHotEncoder(handle_unknown="ignore")` ajustado nas categorias do treino. Se o teste trouxer uma categoria nunca vista no treino, ela simplesmente vira uma linha de zeros nessa feature em vez de quebrar o processo — o modelo não recebe sinal nenhum dela, em vez de o pipeline inteiro travar.
+3. **Feature engineering.** `TotalSpend` é a soma, linha a linha, das cinco colunas de gasto (antes da transformação log, com `skipna=True` para as ausências não zerarem a soma toda). `Cabin`, `Name` e `PassengerId` são descartadas — são identificadores ou texto livre, não muito aproveitáveis do jeito que estão.
+4. **Caudas pesadas.** `log1p` nas cinco colunas de gasto mais a `TotalSpend` recém-criada. A Figura 6 mostra o efeito disso em `FoodCourt`.
+5. **Escalonamento.** Padronizei todo o bloco numérico (as 6 colunas originais + `TotalSpend`) para média 0, desvio 1, ajustado só no treino. Escolhi padronização em vez de espremer tudo em `[-1, 1]` porque, mesmo depois do log, as colunas de gasto ainda têm uma cauda, e um reescalonamento min/max rígido esmagaria os valores grandes (raros, mas legítimos) contra o limite.
 
 ### D — Verify and visualize
 
-![Figure 6](figures/fig6_foodcourt_before_after.png)
+![FoodCourt antes e depois do log1p](figures/fig6_foodcourt_before_after.png)
+/// caption
+**Figura 6** — `FoodCourt` no conjunto de treino, antes e depois do `log1p`. Antes, é basicamente um pico em 0 com uma cauda fina esticada até passar de 25.000. Depois, os mesmos dados ficam bem mais espalhados numa faixa utilizável — algo que uma unidade `tanh` consegue de fato usar, em vez de simplesmente ignorar quase tudo ou saturar nos valores raros e enormes.
+///
 
-*Figure 6 — `FoodCourt` on the training set, before and after `log1p`. Before, it's basically a spike at 0 with a long thin tail stretching out past 25,000. After, the same data is spread out much more evenly across a usable range — something a `tanh` unit can actually work with instead of just ignoring almost everything or saturating on the rare huge values.*
+**Checagens finais**
 
-**Final checks**
+- NaNs restantes: **0**, tanto no treino quanto no teste.
+- Formato final da matriz de features de treino: **(6954, 17)** — são 7 colunas numéricas padronizadas (as 6 originais + `TotalSpend`) mais 10 colunas one-hot (3 de `HomePlanet`, 2 de `CryoSleep`, 3 de `Destination`, 2 de `VIP`). A matriz de teste sai em (1739, 17).
+- Faixa de valores: as colunas numéricas padronizadas vão de **-2.00 a 3.51** no treino (**-2.00 a 3.37** no teste); as colunas one-hot são só 0/1. Não é rigidamente limitado a [-1, 1], mas fica centrado em 0 com a maior parte dos valores a poucas unidades dele — deve ficar confortavelmente na parte não saturada do `tanh`.
 
-- NaNs remaining: **0**, both train and test.
-- Final training feature matrix shape: **(6954, 17)** — that's 7 standardized numeric columns (the 6 original + `TotalSpend`) plus 10 one-hot columns (3 for `HomePlanet`, 2 for `CryoSleep`, 3 for `Destination`, 2 for `VIP`). Test matrix comes out to (1739, 17).
-- Value range: the standardized numeric columns run from **-2.00 to 3.51** on train (**-2.00 to 3.37** on test); one-hot columns are just 0/1. Not hard-clamped to [-1, 1], but centered around 0 with most values within a couple of units of it — should sit comfortably in the non-saturated part of `tanh`.
-
-**Reflection.** If I had to pick the one preprocessing choice that matters most for training, it's the `log1p` on the spending columns. Without it, those raw values (mostly 0, occasionally in the tens of thousands) would completely dominate the scale after standardization — you'd end up with a huge pile of near-identical values at one end and a handful of extreme outliers way out in `tanh`'s saturated region. That's a much bigger deal for how well gradient descent behaves than, say, whether I'd used median vs. mean imputation.
+**Reflexão.** Se eu tivesse que apontar a decisão de pré-processamento que mais importa para o treino, seria o `log1p` nas colunas de gasto. Sem ele, os valores brutos (a maioria 0, ocasionalmente na casa das dezenas de milhares) dominariam completamente a escala depois da padronização — um monte enorme de valores quase idênticos de um lado e alguns outliers extremos bem lá na região saturada do `tanh`. Isso pesa muito mais no comportamento do gradiente descendente do que, digamos, ter usado imputação por mediana em vez de por média.
 
 ---
 
@@ -214,3 +241,11 @@ Why before imputation and scaling? Because both of those steps compute something
 | 11 | Mean and median of FoodCourt on the training set, before transforming | mean 452.61, median 0.00 |
 | 12 | Final shape of the training feature matrix | (6954, 17) |
 | 13 | Minimum and maximum of the training and test sets after scaling | train [-2.00, 3.51], test [-2.00, 3.37] |
+
+## Discussão
+
+A parte que mais exigiu cuidado foi o Exercise 2: é fácil olhar a projeção PCA do Dataset II, ver que parece uma bolha misturada, e concluir errado que os dados são inseparáveis — só ficou claro que não é bem assim ao calcular `‖x‖²` diretamente em 5D e ver os intervalos das duas classes nem se tocarem. Se fosse refazer, teria calculado essa quantidade radial antes mesmo de olhar a projeção, em vez de depois — a ordem em que se olha para os dados muda bastante a intuição que se forma sobre eles.
+
+## Conclusão
+
+Os três exercícios mostram a mesma ideia de ângulos diferentes: a complexidade da fronteira de decisão que uma rede precisa aprender vem da geometria dos dados, não do quanto de dado existe. No Exercise 1, mais dispersão empurra um problema linear para a beira da não-linearidade. No Exercise 2, a estrutura radial do Dataset II é fundamentalmente não linear, não importa quantos pontos se adicione. E no Exercise 3, mesmo antes de qualquer rede entrar em cena, decisões de pré-processamento — sobretudo lidar com a cauda pesada das colunas de gasto — já determinam se as features chegam numa forma que a rede consegue de fato aproveitar.
