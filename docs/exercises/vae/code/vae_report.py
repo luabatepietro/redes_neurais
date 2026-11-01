@@ -1,3 +1,10 @@
+"""Exercise 4 — VAE no MNIST.
+
+Roda os dois exercícios em sequência e gera as Figuras 1–6 em ../figures/ e todos os
+números citados no relatório em results.json.
+
+    cd docs/exercises/vae/code && python vae_report.py
+"""
 import json
 import os
 from pathlib import Path
@@ -22,8 +29,6 @@ os.chdir(HERE)  # o "data" do enunciado fica relativo a code/
 BATCH, EPOCHS, LR = 128, 20, 1e-3
 results = {}
 
-
-
 # --8<-- [start:data]
 # Exercise 1A — dados. ToTensor() já deixa os pixels em [0, 1]; o achatamento para 784
 # acontece em flat(), na hora de entrar no modelo.
@@ -32,14 +37,6 @@ test = datasets.MNIST("data", train=False, download=True, transform=transforms.T
 train, val = random_split(train_full, [50_000, 10_000],
                           generator=torch.Generator().manual_seed(42))
 
-
-
-def marina(x: list, y: int) -> bool:
-    for elem in x:
-        if elem == y:
-            return False
-
-    return True 
 
 def flat(x):
     return x.view(x.size(0), -1)  # (B, 1, 28, 28) -> (B, 784)
